@@ -159,12 +159,10 @@ function App() {
             // await async_grid_board(signAndExecuteTransaction,objectId,cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current);
             
             console.log("create new grid board");
-            // await create_grid_board(signAndExecuteTransaction)
-            const newObjectId: any = await create_grid_board(signAndExecuteTransaction);
-           setObjectId(newObjectId); // 直接切换到新存档
+            await create_grid_board(signAndExecuteTransaction)
             console.log('游戏开始')
-            // await refetch();
-            // await exist()
+            const result = await refetch();
+            if(result){await exist()}
             const emptyGrid: Grid[] = 
       createGridList();
         addNumber(emptyGrid);
@@ -408,12 +406,11 @@ return newGrid;
     console.log('初始化得分: score',score)
     console.log('初始化步数: step',moveStep)
     resetMilestones()
-    const newObjectId: any = await create_grid_board(signAndExecuteTransaction);
-   setObjectId(newObjectId); // 直接切换到新存档
+    await create_grid_board(signAndExecuteTransaction)
     console.log('游戏开始',gameOver, gameOverRef.current)
-    // const result = await refetch();
-    // console.log(result.data); // 这是最新的数据
-    // await exist()
+    const result = await refetch();
+
+    if(result){await exist()}
     setGameOver(false);
     gameOverRef.current = false
    

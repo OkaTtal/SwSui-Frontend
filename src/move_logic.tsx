@@ -1,11 +1,10 @@
 import { Transaction } from '@mysten/sui/transactions';
-import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import './game.css';
 import { bcs } from '@mysten/sui/bcs';
 const PACKAGE_ID = '0x2500b95293d2ba3e5e92ac59dec50f2453d72bb2bbe76acd852a1aeec476f71a';
 const MODULE_NAME = 'swsui_nft';
-import {useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
-import { useSuiClientInfiniteQuery } from "@mysten/dapp-kit";
+// import {useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+// import { useSuiClientInfiniteQuery } from "@mysten/dapp-kit";
 // export function check_grid_board(){
 //   const account = useCurrentAccount();
 //    const { data } = useSuiClientInfiniteQuery(
@@ -54,22 +53,24 @@ signAndExecuteTransaction(
   },
   {
     onSuccess: (result: any) => {
-      console.log('grid board created', result);
+      console.log('grid board updated', result);
     },
   },
 );
 
 }
 
-export function create_grid_board(signAndExecuteTransaction: any) {
-  const tx = new Transaction();
-  tx.moveCall({
-    target: `${PACKAGE_ID}::swsui::create_grid_list`,
-    arguments: [],
-  });
 
-  // 返回一个 Promise，resolve 新 objectId
-  return new Promise((resolve, reject) => {
+  export function create_grid_board(signAndExecuteTransaction: any){  
+    
+   
+      // const [digest, setDigest] = useState('');
+     
+      const tx = new Transaction();
+      tx.moveCall({
+      target: `${PACKAGE_ID}::swsui::create_grid_list`,
+      arguments: [],
+    });
     signAndExecuteTransaction(
       {
         transaction: tx,
@@ -77,34 +78,13 @@ export function create_grid_board(signAndExecuteTransaction: any) {
       },
       {
         onSuccess: (result: any) => {
-          // 从 result.objectChanges 里找到新创建的对象
-          let newObjectId = null;
-          if (result.objectChanges) {
-            for (const obj of result.objectChanges) {
-              if (
-                obj.type === "created" &&
-                obj.objectType &&
-                obj.objectType.includes("::swsui::GridLi")
-              ) {
-                newObjectId = obj.objectId;
-                break;
-              }
-            }
-          }
-          if (newObjectId) {
-            resolve(newObjectId);
-          } else {
-            reject(new Error("No new GridLi objectId found"));
-          }
+          console.log('grid board created', result);
         },
-        onError: (err: any) => {
-          reject(err);
-        },
-      }
+      },
     );
-  });
-}
-
+    
+    
+  }
 
 export function init2(signAndExecuteTransaction: any){  
   const name = new TextEncoder().encode('OkaTtal'); // vector<u8>
