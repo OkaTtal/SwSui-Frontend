@@ -61,17 +61,15 @@ signAndExecuteTransaction(
 
 }
 
+export function create_grid_board(signAndExecuteTransaction: any) {
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${PACKAGE_ID}::swsui::create_grid_list`,
+    arguments: [],
+  });
 
-  export function create_grid_board(signAndExecuteTransaction: any){  
-    
-   
-      // const [digest, setDigest] = useState('');
-     
-      const tx = new Transaction();
-      tx.moveCall({
-      target: `${PACKAGE_ID}::swsui::create_grid_list`,
-      arguments: [],
-    });
+  // 返回一个 Promise，resolve 新 objectId
+  return new Promise((resolve, reject) => {
     signAndExecuteTransaction(
       {
         transaction: tx,
@@ -79,12 +77,34 @@ signAndExecuteTransaction(
       },
       {
         onSuccess: (result: any) => {
-          console.log('grid board created', result);
+          // 从 result.objectChanges 里找到新创建的对象
+          let newObjectId = null;
+          if (result.objectChanges) {
+            for (const obj of result.objectChanges) {
+              if (
+                obj.type === "created" &&
+                obj.objectType &&
+                obj.objectType.includes("::swsui::GridLi")
+              ) {
+                newObjectId = obj.objectId;
+                break;
+              }
+            }
+          }
+          if (newObjectId) {
+            resolve(newObjectId);
+          } else {
+            reject(new Error("No new GridLi objectId found"));
+          }
         },
-      },
+        onError: (err: any) => {
+          reject(err);
+        },
+      }
     );
-    
-  }
+  });
+}
+
 
 export function init2(signAndExecuteTransaction: any){  
   const name = new TextEncoder().encode('OkaTtal'); // vector<u8>

@@ -5,6 +5,7 @@ import { useEvent, getColors } from "./util";
 import Swipe from "react-easy-swipe";
 import './game.css';
 import WaterWave from "react-water-wave";
+
 import { init2,create_grid_board,async_grid_board } from './move_logic'; 
 import { useSuiClientInfiniteQuery } from "@mysten/dapp-kit";
 import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
@@ -25,10 +26,20 @@ type Grid = {
 let checkissue = true
 function App() {
   // resetMilestones()
+  
   const [score, setScore] = useState(0);
   const [objectId, setObjectId] = useState<string | undefined>(undefined);
   const SCORE_MILESTONES = [500,1000,2000,4000,6000];
   const account = useCurrentAccount();    
+
+  const [grid, setGrid] = useState<Grid[]>(createGridList());
+  const [moveStep, setmoveStep] = useState(0);
+  const [gameOver, setGameOver] = useState<boolean>(false);
+  const scoreRef = useRef(score);
+  const moveStepRef = useRef(moveStep);
+  const gameOverRef = useRef(gameOver);
+  console.log('对比01:' + gameOver)
+  console.log('对比02:' +  gameOverRef.current)
   const {
     data,
     refetch
@@ -46,7 +57,7 @@ function App() {
     const allObjs = data?.pages?.flatMap(page => page.data) || [];
     for (const obj of allObjs) {
       if (obj.data?.content?.dataType === "moveObject") {
-        console.log("测试发现: " + obj.data?.content?.fields)
+        // console.log("测试发现: " + obj.data?.content?.fields)
         type GridLiFields = {
           id: { id: string };
           grids: any[];
@@ -114,23 +125,23 @@ function App() {
   const LEFT = 37;
   const RIGHT = 39;
 
-  const [grid, setGrid] = useState<Grid[]>(createGridList());
-  const [moveStep, setmoveStep] = useState(0);
-  const [gameOver, setGameOver] = useState<boolean>(false);
 
-  const init = () => {
+  const init = async () => {
     
     console.log('数据: ' + data)
           
           const returned = exist()
           let grids;
-          if(returned){
+          if(returned && returned.gameover === false){
             grids = returned.grids;
             console.log('返回得分: ' + returned.score)
             console.log('返回步数: ' + returned.move_step)
             setScore(returned.score)
+            scoreRef.current = returned.score; 
             setmoveStep(returned.move_step)
+            moveStepRef.current = returned.move_step;
           }else{
+            console.log('链上暂无grid')
             grids = null
           }
           if (grids) {
@@ -141,10 +152,19 @@ function App() {
             addNumber(grids)
           } else {
             resetMilestones()
+            // const cols = grid.map(grid => grid.col);
+            // const rows = grid.map(grid => grid.row);
+            // const values = grid.map(grid => grid.value);
+            // console.log('游戏结束: ' + gameOver)
+            // await async_grid_board(signAndExecuteTransaction,objectId,cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current);
+            
             console.log("create new grid board");
-            create_grid_board(signAndExecuteTransaction)
-            refetch();
-            exist()
+            // await create_grid_board(signAndExecuteTransaction)
+            const newObjectId: any = await create_grid_board(signAndExecuteTransaction);
+           setObjectId(newObjectId); // 直接切换到新存档
+            console.log('游戏开始')
+            // await refetch();
+            // await exist()
             const emptyGrid: Grid[] = 
       createGridList();
         addNumber(emptyGrid);
@@ -162,21 +182,14 @@ function App() {
       return null;
     }
     checkissue = false
-    // if(first2){
-    //   // create_grid_board(signAndExecuteTransaction)
-    //   // init2(signAndExecuteTransaction);
-    //   // check_grid_board()
-    //   first2 = false;
-    // }
-
-    
-    // create_grid()
   
     return <div>Connected to {account.address}</div>;
   }
-//检查链上存储
-
 function checkAndTriggerMilestones(objectid: any,col: number[],row:number[],value:number[],gameover:boolean,score: number,move_step:number) {
+  if(gameover){
+    return
+  }
+  console.log("实时分数", score)
   if(!minted&&score>=1024){
     init2(signAndExecuteTransaction)
     minted = true;
@@ -199,10 +212,7 @@ function resetMilestones() {
     localStorage.removeItem(key);
   });
 }
-//目标分记录
-
-
-  const addNumber = (newGrid: Grid[]) => {
+  const addNumber = async (newGrid: Grid[]) => {
     if(account){
       let added = false;
     let gridFull = false;
@@ -221,8 +231,17 @@ function resetMilestones() {
         gridFull = true;
         let gameOverr = checkIfGameOver();
         if (gameOverr) {
+          setGameOver(true);
+          gameOverRef.current = true
           alert("game over");
+          console.log('游戏结束?: ',gameOverRef.current)
+          const cols = grid.map(grid => grid.col);
+          const rows = grid.map(grid => grid.row);
+          const values = grid.map(grid => grid.value);
+          console.log('游戏结束: ' + gameOverRef.current)
+          await async_grid_board(signAndExecuteTransaction,objectId,cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current);
         }
+        
       }
     }
     }else{
@@ -302,8 +321,10 @@ function resetMilestones() {
       processLine(lay3, lay3 + endnum, dif, newGrid);
       processLine(lay4, lay4 + endnum, dif, newGrid);
       if (!dummy) {setScore(prev => prev + scoreToAdd)
+        scoreRef.current = scoreRef.current+scoreToAdd;
         if(JSON.stringify(grid) != JSON.stringify(newGrid)){
           setmoveStep(pr=>pr+1)
+          moveStepRef.current = moveStepRef.current+1;
         }
       };
   
@@ -346,8 +367,10 @@ return newGrid;
       processLine(lay3, lay3 + endnum, dif, newGrid);
       processLine(lay4, lay4 + endnum, dif, newGrid);
       if (!dummy) {setScore(prev => prev + scoreToAdd)
+        scoreRef.current = scoreRef.current+scoreToAdd; 
         if(JSON.stringify(grid) != JSON.stringify(newGrid)){
           setmoveStep(pr=>pr+1)
+          moveStepRef.current = moveStepRef.current+1
         }
        
       };
@@ -377,29 +400,37 @@ return newGrid;
 
     return true;
   };
-  const resetGame = () => {
-    resetMilestones()
-    setGameOver(false);
+  const resetGame = async () => {
     setScore(0);
+    scoreRef.current = 0;
     setmoveStep(0)
-    create_grid_board(signAndExecuteTransaction);
-    refetch();
-    exist()
+    moveStepRef.current = 0
+    console.log('初始化得分: score',score)
+    console.log('初始化步数: step',moveStep)
+    resetMilestones()
+    const newObjectId: any = await create_grid_board(signAndExecuteTransaction);
+   setObjectId(newObjectId); // 直接切换到新存档
+    console.log('游戏开始',gameOver, gameOverRef.current)
+    // const result = await refetch();
+    // console.log(result.data); // 这是最新的数据
+    // await exist()
+    setGameOver(false);
+    gameOverRef.current = false
    
     const emptyGrid: Grid[] = createGridList();
     addNumber(emptyGrid);
     addNumber(emptyGrid);
     setGrid(emptyGrid);
   };
-  const start = () =>{
-    if(!ConnectedAccount()){
-      const result = confirm('You need connect your wallet first!');
-    }else{
+  // const start = () =>{
+  //   if(!ConnectedAccount()){
+  //     const result = confirm('You need connect your wallet first!');
+  //   }else{
       
-    }
-  }
+  //   }
+  // }
 
-  const handleKeyDown = (e: Event) => {
+  const handleKeyDown = async (e: Event) => {
     const event = e as KeyboardEvent;
     if (gameOver) {
       return;
@@ -424,11 +455,14 @@ return newGrid;
     let gameOverr = checkIfGameOver();
     if (gameOverr) {
       setGameOver(true);
+      gameOverRef.current = true
+      alert("game over");
+      console.log('游戏结束?: ',gameOverRef.current)
       const cols = grid.map(grid => grid.col);
       const rows = grid.map(grid => grid.row);
       const values = grid.map(grid => grid.value);
-      console.log('游戏结束: ' + gameOver)
-      async_grid_board(signAndExecuteTransaction,objectId,cols,rows,values,true,score,moveStep);
+      console.log('游戏结束: ' + gameOverRef.current)
+      await async_grid_board(signAndExecuteTransaction,objectId,cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current);
       console.log('游戏结束，同步状态')
       resetMilestones()
     }
@@ -442,10 +476,16 @@ return newGrid;
     init();
     
   }else{
+    console.log('链上暂无数据')
     console.log('新grid board')
     setGameOver(false);
+    gameOverRef.current = false
+    // console.log('对比111:' + gameOver)
+    // console.log('对比222:' +  gameOverRef.current)
     setScore(0);
+    scoreRef.current = 0; 
     setmoveStep(0)
+    moveStepRef.current = 0
     create_grid_board(signAndExecuteTransaction);
     refetch();
     exist()
@@ -455,41 +495,15 @@ return newGrid;
     addNumber(emptyGrid)
       setGrid(emptyGrid)
   }
-  }, [data]);
+  }, [data,account,objectId]);
   useEffect(() => {
     const cols = grid.map(grid => grid.col);
     const rows = grid.map(grid => grid.row);
     const values = grid.map(grid => grid.value);
-
-    checkAndTriggerMilestones(objectId,cols,rows,values,gameOver,score,moveStep);
-  }, [score]);
-
-  // useEffect(() => {
-  //   const canvas = document.querySelector('canvas') as any;
-  //   if (canvas) {
-  //     const wave = new WaterWave(canvas);
-  //     (canvas as any).__wave__ = wave; // 
-  //   }
-  //   console.log('canvas', canvas.__wave__)
-  //   if (!canvas || !canvas.__wave__) return;
-  
-  //   let x = 0;
-  //   const y = 200;
-  //   console.log('移动一次')
-  //   const interval = setInterval(() => {
-  //     if (x > window.innerWidth) {
-  //       console.log(x)
-  //       console.log('移动一次')
-  //       clearInterval(interval);
-  //       return;
-  //     }
-  //     canvas.__wave__.drop(x, y, 30, 0.03);
-  //     x += 20; 
-  //   }, 100); 
-  // }, []);
-  
+    checkAndTriggerMilestones(objectId,cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current);
+  }, [score]);  
   useEvent("keydown", handleKeyDown);
-
+  
   return (
     <WaterWave
     imageUrl={'https://t3.ftcdn.net/jpg/05/16/85/12/360_F_516851283_dfzIU1eoEvPE4h0ISpbF4ADa7ZVde1mO.jpg'}
