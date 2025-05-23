@@ -1,35 +1,158 @@
-import React, { useState, useEffect } from "react";
-import { cloneDeep } from 'lodash';
+import React, { useState, useEffect,useRef, forwardRef  } from "react";
+import { cloneDeep, first } from 'lodash';
+
 import { useEvent, getColors } from "./util";
 import Swipe from "react-easy-swipe";
-import * as motion from "motion/react-client"
-import lv1Img from './assets/lv1.jpg';
-import { ConnectButton,useCurrentAccount  } from '@mysten/dapp-kit';
 import './game.css';
-import { AnyDataTag } from "@tanstack/react-query";
+import WaterWave from "react-water-wave";
+import { init2,create_grid_board,async_grid_board } from './move_logic'; 
+import { useSuiClientInfiniteQuery } from "@mysten/dapp-kit";
+import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
+// import { TransactionBlock } from '@mysten/sui.js/transactions';
+// import { useWallets } from '@mysten/dapp-kit';
+const PACKAGE_ID = '0x2500b95293d2ba3e5e92ac59dec50f2453d72bb2bbe76acd852a1aeec476f71a';
+const MODULE_NAME = 'swsui';
+let minted = false;
+let first2 = true
+let total_move_step = 0
+type Grid = {
+    row: number,
+    col:number,
+    value: number
+};
+//  type GridLi = Grid[]
 
-type Grid = number[][];
 let checkissue = true
 function App() {
+  // resetMilestones()
+  const [score, setScore] = useState(0);
+  const [objectId, setObjectId] = useState<string | undefined>(undefined);
+  const SCORE_MILESTONES = [500,1000,2000,4000,6000];
+  const account = useCurrentAccount();    
+  const {
+    data,
+    refetch
+  } = useSuiClientInfiniteQuery(
+    "getOwnedObjects",
+    {
+      owner: account?.address!,
+      filter: { StructType: `${PACKAGE_ID}::${MODULE_NAME}::GridLi` },
+      options: { showContent: true },
+    },
+    { enabled: !!account }
+  );
+  
+  const exist = (): any| null => {
+    const allObjs = data?.pages?.flatMap(page => page.data) || [];
+    for (const obj of allObjs) {
+      if (obj.data?.content?.dataType === "moveObject") {
+        console.log("测试发现: " + obj.data?.content?.fields)
+        type GridLiFields = {
+          id: { id: string };
+          grids: any[];
+          keys: any[];
+          gameover: boolean;
+          // minted: boolean;
+          score: string;     
+          move_step: string;  
+        };
+        
+        const fields = obj.data?.content?.fields as GridLiFields;
+        if (!fields.gameover) {
+          setObjectId(obj.data?.objectId);
+          console.log('发现object_id: ' + obj.data?.objectId); 
+          console.log("Struct Fields:", obj.data?.content?.fields);        
+          console.log("链上grids: " ,fields.grids)  
+          console.log("链上gameover: ", fields.gameover)  
+          const id = fields.id.id; // UID
+          const keys = fields.keys.map(k => k.fields);   // KeyConfirm[]
+          // minted = fields.minted;
+          const gameover = fields.gameover;
+          const score = Number(fields.score);
+          const move_step = Number(fields.move_step);
+          const grids = fields.grids.map((g: any) => ({
+            row: Number(g.fields.row),
+            col: Number(g.fields.col),
+            value: Number(g.fields.value),
+          }));
+          console.log(grids)
+          return {
+            id,
+            keys,
+            gameover,
+            score,
+            move_step,
+            grids,
+          };
+        }
+      }
+    }
+    return null;
+  };
+ 
+  
+ 
+  const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
+    function createGridList(): Grid[]{
+        const grids:Grid[] = [];
+      
+        for (let i = 0; i < 16; i++) {
+          grids.push({
+            row: Math.floor(i / 4),
+            col: i % 4,
+
+            value: 0,
+          });
+        }
+      
+        return grids;
+      }
+      //创建
+
   const UP = 38;
   const DOWN = 40;
   const LEFT = 37;
   const RIGHT = 39;
 
-  const [grid, setGrid] = useState<Grid>([
-    [0, 0, 0, 0],
-    [0, 0, 0, 0],
-    [0, 0, 0, 0],
-    [0, 0, 0, 0],
-  ]);
-
+  const [grid, setGrid] = useState<Grid[]>(createGridList());
+  const [moveStep, setmoveStep] = useState(0);
   const [gameOver, setGameOver] = useState<boolean>(false);
 
   const init = () => {
-    let newGrid = cloneDeep(grid);
-    addNumber(newGrid);
-    addNumber(newGrid);
-    setGrid(newGrid);
+    
+    console.log('数据: ' + data)
+          
+          const returned = exist()
+          let grids;
+          if(returned){
+            grids = returned.grids;
+            console.log('返回得分: ' + returned.score)
+            console.log('返回步数: ' + returned.move_step)
+            setScore(returned.score)
+            setmoveStep(returned.move_step)
+          }else{
+            grids = null
+          }
+          if (grids) {
+            console.log('object_id:', objectId); 
+            // addNumber(grids);
+            // addNumber(grids);
+            setGrid(grids);
+            addNumber(grids)
+          } else {
+            resetMilestones()
+            console.log("create new grid board");
+            create_grid_board(signAndExecuteTransaction)
+            refetch();
+            exist()
+            const emptyGrid: Grid[] = 
+      createGridList();
+        addNumber(emptyGrid);
+        addNumber(emptyGrid);
+        setGrid(emptyGrid);
+      
+   }
+
   };
   
   function ConnectedAccount() {
@@ -39,23 +162,59 @@ function App() {
       return null;
     }
     checkissue = false
+    // if(first2){
+    //   // create_grid_board(signAndExecuteTransaction)
+    //   // init2(signAndExecuteTransaction);
+    //   // check_grid_board()
+    //   first2 = false;
+    // }
+
+    
+    // create_grid()
   
     return <div>Connected to {account.address}</div>;
   }
+//检查链上存储
 
-  const addNumber = (newGrid: Grid) => {
-    let added = false;
+function checkAndTriggerMilestones(objectid: any,col: number[],row:number[],value:number[],gameover:boolean,score: number,move_step:number) {
+  if(!minted&&score>=1024){
+    init2(signAndExecuteTransaction)
+    minted = true;
+  }
+  SCORE_MILESTONES.forEach(milestone => {
+    const key = `milestone_${milestone}`;
+    const triggered = localStorage.getItem(key);
+
+    if (score >= milestone && !triggered) {
+      console.log('调用之前: ' + objectid)
+      async_grid_board(signAndExecuteTransaction,objectid,col,row,value,gameover,score,move_step);
+      console.log("到达一次")
+      localStorage.setItem(key, '1');
+    }
+  });
+}
+function resetMilestones() {
+  SCORE_MILESTONES.forEach(milestone => {
+    const key = `milestone_${milestone}`;
+    localStorage.removeItem(key);
+  });
+}
+//目标分记录
+
+
+  const addNumber = (newGrid: Grid[]) => {
+    if(account){
+      let added = false;
     let gridFull = false;
     let attempts = 0;
     while (!added) {
       if (gridFull) {
         break;
       }
-      let rand1 = Math.floor(Math.random() * 4);
-      let rand2 = Math.floor(Math.random() * 4);
+      let rand = Math.floor(Math.random() * 16);
       attempts++;
-      if (newGrid[rand1][rand2] === 0) {
-        newGrid[rand1][rand2] = Math.random() > 0.5 ? 2 : 4;
+      if (newGrid[rand].value === 0) {
+        newGrid[rand].value = Math.random() > 0.5 ? 2 : 4;
         added = true;
       }
       if (attempts > 50) {
@@ -66,45 +225,37 @@ function App() {
         }
       }
     }
+    }else{
+      console.log('connect your wallet first')
+    }
+    
   };
+  
 
-  const swipeLeft = (dummy?: boolean): Grid | void => {
+  const doSwipe = (direction: number,dummy?: boolean): Grid[] | void => {
     if(checkissue){
       return
     }
     let oldGrid = grid;
-    let newGrid = cloneDeep(grid);
-
-    for (let i = 0; i < 4; i++) {
-      let b = newGrid[i];
-      let slow = 0;
-      let fast = 1;
-      while (slow < 4) {
-        if (fast === 4) {
-          fast = slow + 1;
-          slow++;
-          continue;
-        }
-        if (b[slow] === 0 && b[fast] === 0) {
-          fast++;
-        } else if (b[slow] === 0 && b[fast] !== 0) {
-          b[slow] = b[fast];
-          b[fast] = 0;
-          fast++;
-        } else if (b[slow] !== 0 && b[fast] === 0) {
-          fast++;
-        } else if (b[slow] !== 0 && b[fast] !== 0) {
-          if (b[slow] === b[fast]) {
-            b[slow] += b[fast];
-            b[fast] = 0;
-            fast = slow + 1;
-            slow++;
-          } else {
-            slow++;
-            fast = slow + 1;
-          }
-        }
-      }
+    let newGrid: Grid[];
+    let endnum: number,dif: number;
+  
+    if(direction==0){
+        endnum = 3;
+        dif=1
+        newGrid = swipe_left_up(endnum,dif,0,4,8,12,dummy)
+    }else if(direction==1){
+        endnum=-3;
+        dif=1
+        newGrid = swipe_right_down(endnum,dif,3,7,11,15,dummy)
+    }else if(direction==2){
+        endnum=-12;
+        dif=4
+        newGrid = swipe_right_down(endnum,dif,12,13,14,15,dummy)
+    }else{
+        endnum=12;
+        dif=4
+        newGrid = swipe_left_up(endnum,dif,0,1,2,3,dummy)
     }
     if (JSON.stringify(oldGrid) !== JSON.stringify(newGrid)) {
       addNumber(newGrid);
@@ -115,182 +266,127 @@ function App() {
       setGrid(newGrid);
     }
   };
-
-  const swipeRight = (dummy?: boolean): Grid | void => {
-    if(checkissue){
-      return
-
-    }
-    let oldData = grid;
-    let newGrid = cloneDeep(grid);
-
-    for (let i = 3; i >= 0; i--) {
-      let b = newGrid[i];
-      let slow = b.length - 1;
-      let fast = slow - 1;
-      while (slow > 0) {
-        if (fast === -1) {
-          fast = slow - 1;
-          slow--;
-          continue;
-        }
-        if (b[slow] === 0 && b[fast] === 0) {
-          fast--;
-        } else if (b[slow] === 0 && b[fast] !== 0) {
-          b[slow] = b[fast];
-          b[fast] = 0;
-          fast--;
-        } else if (b[slow] !== 0 && b[fast] === 0) {
-          fast--;
-        } else if (b[slow] !== 0 && b[fast] !== 0) {
-          if (b[slow] === b[fast]) {
-            b[slow] += b[fast];
-            b[fast] = 0;
-            fast = slow - 1;
-            slow--;
+  const swipe_left_up=(endnum: number,dif:number,lay1: number,lay2: number,lay3: number,lay4: number,dummy?: boolean): Grid[]=>{
+    let scoreToAdd = 0;
+    function processLine(start: number, end: number, dif: number, grid: Grid[]) {
+        let cur = 0;
+        let last_index = 0;
+        let move_step = 0;
+        for (let i = start; i <= end; i += dif) {
+          if (grid[i].value === 0) {
+            move_step++;
           } else {
-            slow--;
-            fast = slow - 1;
+            if (cur !== 0 && cur === grid[i].value) {
+              grid[i].value = 0;
+              grid[last_index].value = cur * 2;
+              scoreToAdd += cur * 2;
+              move_step++;
+              cur = 0;
+            } else {
+              cur = grid[i].value;
+            }
+            if (move_step > 0 && grid[i].value !== 0) {
+              last_index = i - (move_step * dif);
+              grid[last_index].value = grid[i].value;
+              grid[i].value = 0;
+            } else if (move_step === 0 && grid[i].value !== 0) {
+              last_index = i - (move_step * dif);
+            }
           }
         }
       }
-    }
-    if (JSON.stringify(newGrid) !== JSON.stringify(oldData)) {
-      addNumber(newGrid);
-    }
-    if (dummy) {
-      return newGrid;
-    } else {
-      setGrid(newGrid);
-    }
-  };
+      const newGrid = cloneDeep(grid);
 
-  const swipeDown = (dummy?: boolean): Grid | void => {
-    if(checkissue){
-      return
-
-    }
-    let b = cloneDeep(grid);
-    let oldData = JSON.parse(JSON.stringify(grid)) as Grid;
-    for (let i = 3; i >= 0; i--) {
-      let slow = b.length - 1;
-      let fast = slow - 1;
-      while (slow > 0) {
-        if (fast === -1) {
-          fast = slow - 1;
-          slow--;
-          continue;
+      processLine(lay1, lay1 + endnum, dif, newGrid);
+      processLine(lay2, lay2 + endnum, dif, newGrid);
+      processLine(lay3, lay3 + endnum, dif, newGrid);
+      processLine(lay4, lay4 + endnum, dif, newGrid);
+      if (!dummy) {setScore(prev => prev + scoreToAdd)
+        if(JSON.stringify(grid) != JSON.stringify(newGrid)){
+          setmoveStep(pr=>pr+1)
         }
-        if (b[slow][i] === 0 && b[fast][i] === 0) {
-          fast--;
-        } else if (b[slow][i] === 0 && b[fast][i] !== 0) {
-          b[slow][i] = b[fast][i];
-          b[fast][i] = 0;
-          fast--;
-        } else if (b[slow][i] !== 0 && b[fast][i] === 0) {
-          fast--;
-        } else if (b[slow][i] !== 0 && b[fast][i] !== 0) {
-          if (b[slow][i] === b[fast][i]) {
-            b[slow][i] += b[fast][i];
-            b[fast][i] = 0;
-            fast = slow - 1;
-            slow--;
+      };
+  
+return newGrid;
+  }
+  const swipe_right_down=(endnum: number,dif:number,lay1: number,lay2: number,lay3: number,lay4: number,dummy?: boolean):Grid[]=>{
+    let scoreToAdd = 0;
+    function processLine(start: number, end: number, dif: number, grid: Grid[]) {
+        let cur = 0;
+        let last_index = 0;
+        let move_step = 0;
+      
+        for (let i = start; i >= end; i -= dif) {
+          if (grid[i].value === 0) {
+            move_step++;
           } else {
-            slow--;
-            fast = slow - 1;
+            if (cur !== 0 && cur === grid[i].value) {
+              grid[i].value = 0;
+              grid[last_index].value = cur * 2;
+              scoreToAdd += cur * 2;
+              move_step++;
+              cur = 0;
+            } else {
+              cur = grid[i].value;
+            }
+            if (move_step > 0 && grid[i].value !== 0) {
+              last_index = i + (move_step * dif);
+              grid[last_index].value = grid[i].value;
+              grid[i].value = 0;
+            } else if (move_step === 0 && grid[i].value !== 0) {
+              last_index = i + (move_step * dif);
+            }
           }
         }
       }
-    }
-    if (JSON.stringify(b) !== JSON.stringify(oldData)) {
-      addNumber(b);
-    }
-    if (dummy) {
-      return b;
-    } else {
-      setGrid(b);
-    }
-  };
+      const newGrid = cloneDeep(grid);
 
-  const swipeUp = (dummy?: boolean): Grid | void => {
-    if(checkissue){
-      return
-
-    }
-    let b = cloneDeep(grid);
-    let oldData = JSON.parse(JSON.stringify(grid)) as Grid;
-    for (let i = 0; i < 4; i++) {
-      let slow = 0;
-      let fast = 1;
-      while (slow < 4) {
-        if (fast === 4) {
-          fast = slow + 1;
-          slow++;
-          continue;
+      processLine(lay1, lay1 + endnum, dif, newGrid);
+      processLine(lay2, lay2 + endnum, dif, newGrid);
+      processLine(lay3, lay3 + endnum, dif, newGrid);
+      processLine(lay4, lay4 + endnum, dif, newGrid);
+      if (!dummy) {setScore(prev => prev + scoreToAdd)
+        if(JSON.stringify(grid) != JSON.stringify(newGrid)){
+          setmoveStep(pr=>pr+1)
         }
-        if (b[slow][i] === 0 && b[fast][i] === 0) {
-          fast++;
-        } else if (b[slow][i] === 0 && b[fast][i] !== 0) {
-          b[slow][i] = b[fast][i];
-          b[fast][i] = 0;
-          fast++;
-        } else if (b[slow][i] !== 0 && b[fast][i] === 0) {
-          fast++;
-        } else if (b[slow][i] !== 0 && b[fast][i] !== 0) {
-          if (b[slow][i] === b[fast][i]) {
-            b[slow][i] += b[fast][i];
-            b[fast][i] = 0;
-            fast = slow + 1;
-            slow++;
-          } else {
-            slow++;
-            fast = slow + 1;
-          }
-        }
-      }
-    }
-    if (JSON.stringify(oldData) !== JSON.stringify(b)) {
-      addNumber(b);
-    }
-    if (dummy) {
-      return b;
-    } else {
-      setGrid(b);
-    }
-  };
-
+       
+      };
+  
+return newGrid;
+  }
   const checkIfGameOver = (): boolean => {
-    let checker = swipeLeft(true);
+    let checker = doSwipe(0,true);
     if (JSON.stringify(grid) !== JSON.stringify(checker)) {
       return false;
     }
 
-    let checker2 = swipeDown(true);
+    let checker2 = doSwipe(2,true);
     if (JSON.stringify(grid) !== JSON.stringify(checker2)) {
       return false;
     }
 
-    let checker3 = swipeRight(true);
+    let checker3 = doSwipe(1,true);
     if (JSON.stringify(grid) !== JSON.stringify(checker3)) {
       return false;
     }
 
-    let checker4 = swipeUp(true);
+    let checker4 = doSwipe(3,true);
     if (JSON.stringify(grid) !== JSON.stringify(checker4)) {
       return false;
     }
 
     return true;
   };
-
   const resetGame = () => {
+    resetMilestones()
     setGameOver(false);
-    const emptyGrid: Grid = [
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-      [0, 0, 0, 0],
-    ];
+    setScore(0);
+    setmoveStep(0)
+    create_grid_board(signAndExecuteTransaction);
+    refetch();
+    exist()
+   
+    const emptyGrid: Grid[] = createGridList();
     addNumber(emptyGrid);
     addNumber(emptyGrid);
     setGrid(emptyGrid);
@@ -310,16 +406,16 @@ function App() {
     }
     switch (event.keyCode) {
       case UP:
-        swipeUp();
+        doSwipe(3);
         break;
       case DOWN:
-        swipeDown();
+        doSwipe(2);
         break;
       case LEFT:
-        swipeLeft();
+        doSwipe(0);
         break;
       case RIGHT:
-        swipeRight();
+        doSwipe(1);
         break;
       default:
         break;
@@ -328,15 +424,85 @@ function App() {
     let gameOverr = checkIfGameOver();
     if (gameOverr) {
       setGameOver(true);
+      const cols = grid.map(grid => grid.col);
+      const rows = grid.map(grid => grid.row);
+      const values = grid.map(grid => grid.value);
+      console.log('游戏结束: ' + gameOver)
+      async_grid_board(signAndExecuteTransaction,objectId,cols,rows,values,true,score,moveStep);
+      console.log('游戏结束，同步状态')
+      resetMilestones()
     }
   };
 
   useEffect(() => {
+    if (data&&account) {
+      console.log("已有grid board")
+    // resetMilestones()
+    
     init();
-  }, []);
+    
+  }else{
+    console.log('新grid board')
+    setGameOver(false);
+    setScore(0);
+    setmoveStep(0)
+    create_grid_board(signAndExecuteTransaction);
+    refetch();
+    exist()
+    
+    const emptyGrid: Grid[] = createGridList();
+    addNumber(emptyGrid)
+    addNumber(emptyGrid)
+      setGrid(emptyGrid)
+  }
+  }, [data]);
+  useEffect(() => {
+    const cols = grid.map(grid => grid.col);
+    const rows = grid.map(grid => grid.row);
+    const values = grid.map(grid => grid.value);
 
+    checkAndTriggerMilestones(objectId,cols,rows,values,gameOver,score,moveStep);
+  }, [score]);
+
+  // useEffect(() => {
+  //   const canvas = document.querySelector('canvas') as any;
+  //   if (canvas) {
+  //     const wave = new WaterWave(canvas);
+  //     (canvas as any).__wave__ = wave; // 
+  //   }
+  //   console.log('canvas', canvas.__wave__)
+  //   if (!canvas || !canvas.__wave__) return;
+  
+  //   let x = 0;
+  //   const y = 200;
+  //   console.log('移动一次')
+  //   const interval = setInterval(() => {
+  //     if (x > window.innerWidth) {
+  //       console.log(x)
+  //       console.log('移动一次')
+  //       clearInterval(interval);
+  //       return;
+  //     }
+  //     canvas.__wave__.drop(x, y, 30, 0.03);
+  //     x += 20; 
+  //   }, 100); 
+  // }, []);
+  
   useEvent("keydown", handleKeyDown);
+
   return (
+    <WaterWave
+    imageUrl={'https://t3.ftcdn.net/jpg/05/16/85/12/360_F_516851283_dfzIU1eoEvPE4h0ISpbF4ADa7ZVde1mO.jpg'}
+    perturbance={0.03}
+    resolution={512}
+    dropRadius={30}
+    style={{
+      width: '100vw',
+      height: '100vh',
+      backgroundSize: 'cover',  
+      backgroundPosition: 'center center'
+    }}
+  >{({})=>
     <div className="App" 
     style={{
       display: "flex",
@@ -344,9 +510,8 @@ function App() {
       alignItems: "center",
       height: "100vh",
       width: "100vw",
-      background: "#D2E3F1",
+      // background: "#D2E3F1",
       //whole bg
-
     }}>
       <div
         style={{
@@ -358,17 +523,18 @@ function App() {
         <div style={{ display: "flex" }}>
           <div
             style={{
-              fontFamily: "sans-serif",
-              flex: 1,
-              fontWeight: "700",
-              fontSize: 40,
-              marginLeft: 113,
-              color: "#2775b6",
+              fontSize: 40
             }}
+             className="titleLine"
           >
             SwSui
           </div>
-          <div className="App" id = 'ewallet'>
+          <div className="App" id = 'ewallet' style={{
+    position: 'absolute',
+    top: 10,
+    right: 100,
+    zIndex: 1000,
+  }}> 
               <header className="App-header">
               <div className={ConnectedAccount() ? "wallet-wrapper connected" : "wallet-wrapper"}>
                   <ConnectButton />
@@ -376,11 +542,36 @@ function App() {
                 </div>
               </header>
             </div>
+            <div
+            style={{
+              fontSize: 22,
+              marginTop: 10,
+              marginRight: -23,
+            }}
+            className="titleLine"
+          >
+           Score: <span style={{ fontSize: 17 }}>{score}</span>
+          </div>
+          <div
+            style={{
+              fontSize: 22,
+              marginTop: 10,
+              marginRight: -103,
+            }}
+              className="titleLine"
+          >
+            Move: <span style={{ fontSize: 17}}>{moveStep}</span>
+          </div>
+            
         </div>
         <div
           style={{
-            background: "#A3BBDB",
+            // background: "#A3BBDB",
             //grid background
+            background: 'rgba(255, 255, 255, 0.2)',
+            // backdropFilter: 'blur(10px)',
+            // border: '1px solid rgba(255, 255, 255, 0.3)',
+
             width: "max-content",
             height: "max-content",
             margin: "auto",
@@ -391,35 +582,22 @@ function App() {
           }}
         >
           {gameOver && (
-            <div style={style.gameOverOverlay as React.CSSProperties}>
-              <div>
-                <div
-                  style={{
-                    fontSize: 30,
-                    fontFamily: "sans-serif",
-                    fontWeight: "900",
-                    color: "#776E65",
-                  }}
-                >
-                  Game Over
-                </div>
-                <div>
-                  <div
-                    style={{
-                      flex: 1,
-                      marginTop: "auto",
-                    }}
-                  >
-                    <div onClick={resetGame} style={style.tryAgainButton}>
+  <div className="gameOverOverlay">
+    <div>
+      <img
+        src="gameover.jpg"
+        alt="Game Over"
+        style={{ width: 200, height: "auto", marginBottom: 20 }}
+      />
+      <div onClick={resetGame} className="tryAgain">
                       Try Again
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+    </div>
+  </div>
+)}
+
              {!ConnectedAccount() && (
-            <div style={style.gameOverOverlay as React.CSSProperties}>
+            <div className="gameOverOverlay">
               <div>
                 <div>
                   <div
@@ -428,7 +606,7 @@ function App() {
                       marginTop: "auto",
                     }}
                   >
-                    <div style={style.startButton}>
+                    <div className="startButton">
                       Sign to unlock
                     </div>
                   </div>
@@ -438,120 +616,90 @@ function App() {
           )}
           <Swipe
             onSwipeDown={() => {
-              swipeDown();
+            doSwipe(2);
             }}
-            onSwipeLeft={() => swipeLeft()}
-            onSwipeRight={() => swipeRight()}
-            onSwipeUp={() => swipeUp()}
+            onSwipeLeft={() => doSwipe(0)}
+            onSwipeRight={() =>  doSwipe(1)}
+            onSwipeUp={() => doSwipe(3)}
             style={{ overflowY: "hidden" }}
           >
-            {grid.map((row, oneIndex) => {
-              return (
-                <div style={{ display: "flex" }} key={oneIndex}>
-                  {row.map((digit, index) => (
-                    <Block num={digit} key={index} />
-                  ))}
-                </div>
-              );
-            })}
+
+                <div style={{ position: "relative", width: 400, height: 400 }}>
+                {grid.map(({ row, col, value }, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      position: "absolute",
+                      top: row * 100,
+                      left: col * 100,
+                      width: 100,
+                      height: 100
+                    }}
+                  >
+                    <Block num={value} />
+                  </div>
+                ))}
+              </div>
+           
           </Swipe>
         </div>
       </div>
     </div>
+}</WaterWave>
   );
    
 }
 
-const Block = ({ num }:any) => {
-  const { blockStyle } = style;
-  const lvimage: Record<string, string> = {
-    2: '/lv1.jpg',
-    4: '/lv2.jpg',
-    8: '/lv3.jpg',
-    16: '/lv4.jpg',
-    32: '/lv5.jpg',
-    64: '/lv6.jpg',
-    128: '/lv7.jpg',
-    256: '/lv8.jpg',
-    512: '/lv9.jpg',
-    1024: '/lv10.jpg',
-    2048: '/lv11.jpg',
-    4096: '/lv12.jpg',
-    8192: '/lv13.jpg',
+const Block = ({ num}: { num: number}) => {
+  const [animate, setAnimate] = React.useState(false);
+
+  const lvimage: Record<number, string> = {
+    2: "/lv1.jpg",
+    4: "/lv2.jpg",
+    8: "/lv3.jpg",
+    16: "/lv4.jpg",
+    32: "/lv5.jpg",
+    64: "/lv6.jpg",
+    128: "/lv7.jpg",
+    256: "/lv8.jpg",
+    512: "/lv9.jpg",
+    1024: "/lv10.jpg",
+    2048: "/lv11.jpg",
+    4096: "/lv12.jpg",
+    8192: "/lv13.jpg",
   };
-//set grid 
+
+  React.useEffect(() => {
+    if (num === 0) return; 
+    setAnimate(true);
+    const timer = setTimeout(() => setAnimate(false), 300);
+    return () => clearTimeout(timer);
+  }, [num]);
+
   return (
     <div
+      className={`block ${animate ? "splash" : ""}`}
       style={{
-        ...blockStyle,
         background: getColors(num),
-        color: num === 2 || num === 4 ? "#645B52" : "#F7F4EF",
+        borderRadius: "10px", 
+    boxShadow: "0 4px 30px rgba(0, 0, 0, 0.2)", 
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)", 
+    border: "1px solid rgba(255, 255, 255, 0.2)" 
+
+        // color: num === 2 || num === 4 ? "#645B52" : "#F7F4EF",
       }}
     >
-      {num !== 0 ? <img
-    src={lvimage[num]}
-    alt={num.toString()}
-    style={{ width: "100%", height: "100%" }}
-  /> : ""}
-      
-      {/* <img
-    src={`/assets/${num}.jpg`}
-    alt={num.toString()}
-    style={{ width: "100%", height: "100%" }}
-  /> */}
-  
+      {num !== 0 ? (
+        <img
+          src={lvimage[num]}
+          alt={num.toString()}
+          style={{ width: "100%", height: "100%" }}
+        />
+      ) : (
+        ""
+      )}
     </div>
   );
-};
-
-const style = {
-  blockStyle: {
-    height: 80,
-    width: 80,
-    background: "lightgray",
-    margin: 3,
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    fontSize: 45,
-    fontWeight: "800",
-    color: "white",
-  },
-  tryAgainButton: {
-    padding: 10,
-    background: "#2774b6",
-    color: "#F8F5F0",
-    width: 80,
-    borderRadius: 7,
-    fontWeight: "900",
-    cursor: "pointer",
-    margin: "auto",
-    marginTop: 20,
-  },
-  startButton: {
-    padding: 20,
-    background: 'linear-gradient(to right, #225fc8, #6695dd, #225fc8)',
-  backgroundSize: '200% 100%',
-  animation: 'gradientMove 5s ease infinite',
-    color: "#F8F5F0",
-    borderRadius: 30,
-    fontWeight: "700",
-    cursor: "pointer",
-    margin: "auto",
-    marginTop: 20,
-    
-  },
-  gameOverOverlay: {
-    position: "absolute",
-    height: "100%",
-    width: "100%",
-    left: 0,
-    top: 0,
-    borderRadius: 5,
-    background: "rgba(238,228,218,.5)",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
 };
 export default App;

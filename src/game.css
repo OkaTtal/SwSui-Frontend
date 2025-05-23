@@ -1,3 +1,9 @@
+@font-face {
+  font-family: 'WaterBrush';
+  src: url('water_galon/Water Galon.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
 @keyframes gradientMove {
     0% {
       background-position: 0% 50%;
@@ -7,6 +13,16 @@
     }
     100% {
       background-position: 0% 50%;
+    }
+  }
+  @keyframes waveText {
+    0%, 100% {
+      transform: scale(1);
+      color: #40b0dd;
+    }
+    50% {
+      transform: scale(1.1);
+      color: #0d7db1;
     }
   }
 .wallet-wrapper {
@@ -19,6 +35,7 @@
   border-radius: 10px;
   }
   .wallet-wrapper button {
+    font-family: 'WaterBrush', sans-serif;
     background: transparent !important;
     /* color: transparent !important; */
     border: none !important;
@@ -42,7 +59,6 @@
     color: transparent !important;
     font-size: 0 !important;
     text-indent: -9999px !important;
-
   }
   
   
@@ -74,4 +90,86 @@
     object-fit: cover;
     
   }
+ .block {
+    background: lightgray;
+    margin: 3px;
+    height:95px;
+    width:95px;
+    display: flex;
+    justify-Content: center;
+    align-Items: center;
+    font-Size: 45px;
+    font-Weight: 800;
+    color: white;
+  }
+  .tryAgain{
+      padding: 10;
+      background: #2774b6;
+      font-family: 'WaterBrush', sans-serif;
+      color: #F8F5F0;
+      width: 80px;
+      border-Radius: 7px;
+      font-Weight: 900;
+      cursor: pointer;
+      margin: auto;
+      margin-Top: 20px;
+      height: 30px;
+      width: 100px;
+      text-align: center;
+  }
+  .startButton{
+    padding: 20px;
+    background: linear-gradient(to right, #225fc8, #6695dd, #225fc8);
+  background-Size: 200% 100%;
+  animation: gradientMove 5s ease infinite;
+    color: #F8F5F0;
+    font-family: 'WaterBrush', sans-serif;
+    border-Radius: 30px;
+    font-Weight: 700;
+    margin: auto;
+    margin-Top: 20px;
+  }
+    .gameOverOverlay{
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    left: 0px;
+    top: 0px;
+    border-Radius: 25px;
+    z-Index: 10;
+    background: rgba(238,228,218,.5);
+    display: flex;
+    justify-Content: center;
+    align-Items: center
+  }
+  .titleLine{
+    /* font-Family: sans-serif; */
+    font-family: 'WaterBrush', sans-serif;
+    animation: waveText 2s ease-in-out infinite;
+    flex: 1;
+    font-Weight: 700;
+     color: #2775b6
+  }
+  @keyframes splash {
+    0% {
+      transform: scale(0.3);
+      box-shadow: 0 0 0 0 rgba(30, 144, 255, 0.4);
+      opacity: 0.5;
+    }
+    70% {
+      transform: scale(1.2);
+      box-shadow: 0 0 20px 15px rgba(30, 144, 255, 0);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(30, 144, 255, 0);
+      opacity: 1;
+    }
+  }
+  
+  .splash {
+    animation: splash 0.6s ease-out;
+  }
+  
   
