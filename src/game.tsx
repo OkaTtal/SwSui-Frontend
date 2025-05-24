@@ -6,7 +6,7 @@ import Swipe from "react-easy-swipe";
 import './game.css';
 import WaterWave from "react-water-wave";
 
-import { init2,create_grid_board,async_grid_board } from './move_logic'; 
+import { send_nft,create_grid_board,async_grid_board } from './move_logic'; 
 import { useSuiClientInfiniteQuery } from "@mysten/dapp-kit";
 import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 // import { TransactionBlock } from '@mysten/sui.js/transactions';
@@ -29,7 +29,13 @@ function App() {
   
   const [score, setScore] = useState(0);
   const [objectId, setObjectId] = useState<string | undefined>(undefined);
-  const SCORE_MILESTONES = [500,1000,2000,4000,6000];
+  const SCORE_MILESTONES = [
+    500, 1000, 2000, 4000, 6000,
+    8000, 10000, 13000, 17000, 22000,
+    28000, 35000, 45000, 60000, 80000,
+    100000, 130000, 170000, 220000, 280000,
+    350000, 450000, 600000, 800000, 1000000
+  ];  
   const account = useCurrentAccount();    
 
   const [grid, setGrid] = useState<Grid[]>(createGridList());
@@ -189,7 +195,7 @@ function checkAndTriggerMilestones(objectid: any,col: number[],row:number[],valu
   }
   console.log("实时分数", score)
   if(!minted&&score>=1024){
-    init2(signAndExecuteTransaction)
+    send_nft(signAndExecuteTransaction)
     minted = true;
   }
   SCORE_MILESTONES.forEach(milestone => {

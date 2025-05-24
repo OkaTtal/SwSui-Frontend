@@ -1,7 +1,7 @@
 import { Transaction } from '@mysten/sui/transactions';
 import './game.css';
 import { bcs } from '@mysten/sui/bcs';
-const PACKAGE_ID = '0x2500b95293d2ba3e5e92ac59dec50f2453d72bb2bbe76acd852a1aeec476f71a';
+const PACKAGE_ID = '0xe1686a481c2ec5177f400f322d9bccc207d3af598885056c4c96aca1c4fd4881';
 const MODULE_NAME = 'swsui_nft';
 // import {useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 // import { useSuiClientInfiniteQuery } from "@mysten/dapp-kit";
@@ -86,11 +86,11 @@ signAndExecuteTransaction(
     
   }
 
-export function init2(signAndExecuteTransaction: any){  
-  const name = new TextEncoder().encode('OkaTtal'); // vector<u8>
-  const description = new TextEncoder().encode('First NFT');
-  const newDescription = new TextEncoder().encode('First NFT Fixed');
-  const url = new TextEncoder().encode('ipfs://bafkreiakul5pov7ajwuf3ubunhx62vqiivsty2jkyzaai3xhcjotee3fcu');
+export function send_nft(signAndExecuteTransaction: any){  
+  const name = new TextEncoder().encode('Waves'); // vector<u8>
+  const description = new TextEncoder().encode('SwSui NFT');
+  const creator = new TextEncoder().encode('First NFT Fixed');
+  const url = new TextEncoder().encode('ipfs://bafybeighr4vxio3ibq56caivcfcck6vdngydexx6xylip26ksch7gmcvpa');
   
  
     // const [digest, setDigest] = useState('');
@@ -103,7 +103,8 @@ export function init2(signAndExecuteTransaction: any){
       tx.pure(bcs.vector(bcs.U8).serialize(name)),        
       tx.pure(bcs.vector(bcs.U8).serialize(description)), 
       tx.pure(bcs.vector(bcs.U8).serialize(url)),   
-      tx.pure(bcs.vector(bcs.U8).serialize(url)),          
+      tx.pure(bcs.vector(bcs.U8).serialize(url)), 
+
     ],
   });
   // tx.moveCall({
