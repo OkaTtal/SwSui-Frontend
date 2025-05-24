@@ -1,7 +1,7 @@
 import { Transaction } from '@mysten/sui/transactions';
 import './game.css';
 import { bcs } from '@mysten/sui/bcs';
-const PACKAGE_ID = '0xe1686a481c2ec5177f400f322d9bccc207d3af598885056c4c96aca1c4fd4881';
+const PACKAGE_ID = '0x96b0315bd40612c3c0bab82e30e0f9235cbe3ba3bac7071ca436f876ac38c661';
 const MODULE_NAME = 'swsui_nft';
 // import {useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 // import { useSuiClientInfiniteQuery } from "@mysten/dapp-kit";

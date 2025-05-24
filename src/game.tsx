@@ -11,7 +11,7 @@ import { useSuiClientInfiniteQuery } from "@mysten/dapp-kit";
 import { ConnectButton, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit';
 // import { TransactionBlock } from '@mysten/sui.js/transactions';
 // import { useWallets } from '@mysten/dapp-kit';
-const PACKAGE_ID = '0x2500b95293d2ba3e5e92ac59dec50f2453d72bb2bbe76acd852a1aeec476f71a';
+const PACKAGE_ID = '0x96b0315bd40612c3c0bab82e30e0f9235cbe3ba3bac7071ca436f876ac38c661';
 const MODULE_NAME = 'swsui';
 let minted = false;
 let first2 = true
