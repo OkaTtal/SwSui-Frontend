@@ -5,6 +5,7 @@ import { useEvent, getColors } from "./util";
 import Swipe from "react-easy-swipe";
 import './game.css';
 import WaterWave from "react-water-wave";
+import Popup from './popup';
 
 import { send_nft,create_grid_board,async_grid_board } from './move_logic'; 
 import { useSuiClientInfiniteQuery } from "@mysten/dapp-kit";
@@ -16,6 +17,7 @@ const MODULE_NAME = 'swsui';
 let minted = false;
 let first2 = true
 let total_move_step = 0
+let is2048 = false;
 type Grid = {
     row: number,
     col:number,
@@ -26,9 +28,12 @@ type Grid = {
 let checkissue = true
 function App() {
   // resetMilestones()
-  
+  const [showPopup, setShowPopup] = useState(false);
+  const [showMint, setShowMint] = useState(false);
+  const [showContinue, setShowContinue] = useState(false);
   const [score, setScore] = useState(0);
-  const [objectId, setObjectId] = useState<string | undefined>(undefined);
+  const [loading, setLoading] = useState(false);
+  const [mint, setMint] = useState(false)
   const SCORE_MILESTONES = [
     500, 1000, 2000, 4000, 6000,
     8000, 10000, 13000, 17000, 22000,
@@ -44,6 +49,8 @@ function App() {
   const scoreRef = useRef(score);
   const moveStepRef = useRef(moveStep);
   const gameOverRef = useRef(gameOver);
+  const objectRef = useRef('1')
+  const versionRef = useRef('1')
   console.log('对比01:' + gameOver)
   console.log('对比02:' +  gameOverRef.current)
   const {
@@ -59,8 +66,10 @@ function App() {
     { enabled: !!account }
   );
   
-  const exist = (): any| null => {
-    const allObjs = data?.pages?.flatMap(page => page.data) || [];
+  const exist = async (): Promise<any | null> => {
+    const { data: latestdata } = await refetch();
+    
+    const allObjs = latestdata?.pages?.flatMap(page => page.data) || [];
     for (const obj of allObjs) {
       if (obj.data?.content?.dataType === "moveObject") {
         // console.log("测试发现: " + obj.data?.content?.fields)
@@ -76,11 +85,14 @@ function App() {
         
         const fields = obj.data?.content?.fields as GridLiFields;
         if (!fields.gameover) {
-          setObjectId(obj.data?.objectId);
-          console.log('发现object_id: ' + obj.data?.objectId); 
-          console.log("Struct Fields:", obj.data?.content?.fields);        
+          objectRef.current = obj.data?.objectId
+          console.log('更新后objectid: ',objectRef.current)   
           console.log("链上grids: " ,fields.grids)  
-          console.log("链上gameover: ", fields.gameover)  
+          console.log("链上gameover: ", fields.gameover)         
+          const version = obj.data.version;
+          versionRef.current = obj.data.version
+          console.log('最新版本号: ', version)
+          
           const id = fields.id.id; // UID
           const keys = fields.keys.map(k => k.fields);   // KeyConfirm[]
           // minted = fields.minted;
@@ -136,7 +148,7 @@ function App() {
     
     console.log('数据: ' + data)
           
-          const returned = exist()
+          const returned = await exist()
           let grids;
           if(returned && returned.gameover === false){
             grids = returned.grids;
@@ -151,24 +163,16 @@ function App() {
             grids = null
           }
           if (grids) {
-            console.log('object_id:', objectId); 
-            // addNumber(grids);
-            // addNumber(grids);
+            console.log('object_id:', objectRef.current); 
             setGrid(grids);
             addNumber(grids)
           } else {
-            resetMilestones()
-            // const cols = grid.map(grid => grid.col);
-            // const rows = grid.map(grid => grid.row);
-            // const values = grid.map(grid => grid.value);
-            // console.log('游戏结束: ' + gameOver)
-            // await async_grid_board(signAndExecuteTransaction,objectId,cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current);
-            
-            console.log("create new grid board");
-            await create_grid_board(signAndExecuteTransaction)
+            resetMilestones()            
+            console.log("creating new grid board...");
+            setLoading(true)
+            await create_grid_board(signAndExecuteTransaction,setLoading)
+            // exist()
             console.log('游戏开始')
-            const result = await refetch();
-            if(result){await exist()}
             const emptyGrid: Grid[] = 
       createGridList();
         addNumber(emptyGrid);
@@ -189,22 +193,31 @@ function App() {
   
     return <div>Connected to {account.address}</div>;
   }
-function checkAndTriggerMilestones(objectid: any,col: number[],row:number[],value:number[],gameover:boolean,score: number,move_step:number) {
+function checkAndTriggerMilestones(col: number[],row:number[],value:number[],gameover:boolean,score: number,move_step:number) {
   if(gameover){
     return
   }
   console.log("实时分数", score)
-  if(!minted&&score>=1024){
-    send_nft(signAndExecuteTransaction)
-    minted = true;
-  }
-  SCORE_MILESTONES.forEach(milestone => {
+  // if(!minted&&score>=400){
+  //   setLoading(true)
+  //   // send_nft(signAndExecuteTransaction,setLoading)
+  //   minted=true
+  //   setMint(true)
+  // }
+  SCORE_MILESTONES.forEach(async milestone => {
     const key = `milestone_${milestone}`;
     const triggered = localStorage.getItem(key);
 
     if (score >= milestone && !triggered) {
-      console.log('调用之前: ' + objectid)
-      async_grid_board(signAndExecuteTransaction,objectid,col,row,value,gameover,score,move_step);
+      console.log('调用之前: ' + objectRef.current)
+      setLoading(true)
+      let checking = await refetch()
+      if(checking){
+        await exist()
+        console.log('调用: ' + objectRef.current)
+      async_grid_board(signAndExecuteTransaction,objectRef.current,col,row,value,gameover,score,move_step,setLoading);
+    }
+      // exist()
       console.log("到达一次")
       localStorage.setItem(key, '1');
     }
@@ -243,8 +256,12 @@ function resetMilestones() {
           const rows = grid.map(grid => grid.row);
           const values = grid.map(grid => grid.value);
           console.log('游戏结束: ' + gameOverRef.current)
-          await async_grid_board(signAndExecuteTransaction,objectId,cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current);
-        }
+          setLoading(true)
+  
+          await exist()
+          console.log('结束object id: ' + objectRef.current)
+          await async_grid_board(signAndExecuteTransaction,objectRef.current,cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current,setLoading);}
+          // exist()
         
       }
     }
@@ -302,6 +319,10 @@ function resetMilestones() {
             if (cur !== 0 && cur === grid[i].value) {
               grid[i].value = 0;
               grid[last_index].value = cur * 2;
+              if(grid[last_index].value==1024&&!is2048){
+                setMint(true)
+                is2048=true
+              }
               scoreToAdd += cur * 2;
               move_step++;
               cur = 0;
@@ -348,6 +369,10 @@ return newGrid;
             if (cur !== 0 && cur === grid[i].value) {
               grid[i].value = 0;
               grid[last_index].value = cur * 2;
+              if(grid[last_index].value==1024&&!is2048){
+                setMint(true)
+                is2048=true
+              }
               scoreToAdd += cur * 2;
               move_step++;
               cur = 0;
@@ -412,7 +437,12 @@ return newGrid;
     console.log('初始化得分: score',score)
     console.log('初始化步数: step',moveStep)
     resetMilestones()
-    await create_grid_board(signAndExecuteTransaction)
+    setLoading(true)
+    let checking = await refetch()
+    if(checking){
+      await exist()
+    await create_grid_board(signAndExecuteTransaction,setLoading)}
+    // exist()
     console.log('游戏开始',gameOver, gameOverRef.current)
     const result = await refetch();
 
@@ -435,7 +465,7 @@ return newGrid;
 
   const handleKeyDown = async (e: Event) => {
     const event = e as KeyboardEvent;
-    if (gameOver) {
+    if (gameOver||loading||mint) {
       return;
     }
     switch (event.keyCode) {
@@ -465,7 +495,14 @@ return newGrid;
       const rows = grid.map(grid => grid.row);
       const values = grid.map(grid => grid.value);
       console.log('游戏结束: ' + gameOverRef.current)
-      await async_grid_board(signAndExecuteTransaction,objectId,cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current);
+      setLoading(true)
+      let result =  await refetch()
+      if(result){
+        console.log('结束2前object id: ' + objectRef.current)
+        await exist()
+        console.log('结束前object id: ' + objectRef.current)
+      }
+      await async_grid_board(signAndExecuteTransaction,objectRef.current,cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current,setLoading);
       console.log('游戏结束，同步状态')
       resetMilestones()
     }
@@ -473,9 +510,8 @@ return newGrid;
 
   useEffect(() => {
     if (data&&account) {
-      console.log("已有grid board")
+      console.log("已有数据")
     // resetMilestones()
-    
     init();
     
   }else{
@@ -489,21 +525,20 @@ return newGrid;
     scoreRef.current = 0; 
     setmoveStep(0)
     moveStepRef.current = 0
-    create_grid_board(signAndExecuteTransaction);
-    refetch();
-    exist()
+    setLoading(true)
     
+    create_grid_board(signAndExecuteTransaction,setLoading);
     const emptyGrid: Grid[] = createGridList();
     addNumber(emptyGrid)
     addNumber(emptyGrid)
       setGrid(emptyGrid)
   }
-  }, [data,account,objectId]);
+  }, [account]);
   useEffect(() => {
     const cols = grid.map(grid => grid.col);
     const rows = grid.map(grid => grid.row);
     const values = grid.map(grid => grid.value);
-    checkAndTriggerMilestones(objectId,cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current);
+    checkAndTriggerMilestones(cols,rows,values,gameOverRef.current,scoreRef.current,moveStepRef.current);
   }, [score]);  
   useEvent("keydown", handleKeyDown);
   
@@ -612,6 +647,63 @@ return newGrid;
     </div>
   </div>
 )}
+{/* 暂停点 */}
+{mint && (
+  <div className="gameOverOverlay">
+    <div>
+      {/* <img
+        src="gameover.jpg"
+        alt="Game Over"
+        style={{ width: 200, height: "auto", marginBottom: 20 }}
+      /> */}
+      <div className="tryAgain" onClick={() => {setShowPopup(true);setShowMint(true)}}>
+                      Mint NFT
+                    </div>
+                    <Popup
+        isOpen={showPopup&&showMint}
+        title="you could mint NFT only once !"
+        onConfirm={() => {
+          setShowPopup(false);setShowMint(false);setMint(false);
+          send_nft(signAndExecuteTransaction,setLoading)
+
+        }}
+        onCancel={() => {
+          setShowPopup(false);setShowMint(false)
+        }}
+      />
+              <Popup
+        isOpen={showPopup&&showContinue}
+        title="you may lose your NFT !"
+        onConfirm={() => {
+          setShowPopup(false);setShowContinue(false);setMint(false)
+
+        }}
+        onCancel={() => {
+          setShowPopup(false);setShowContinue(false)
+        }}
+      />
+                    <div className="tryAgain" onClick={() => {setShowPopup(true);setShowContinue(true)}}>
+                    Continue
+                    </div>
+    </div>
+  </div>
+)}
+{loading && !mint &&(
+  <div className="gameOverOverlay">
+    <div>
+      {/* <img
+        src="gameover.jpg"
+        alt="Game Over"
+        style={{ width: 200, height: "auto", marginBottom: 20 }}
+      /> */}
+      <div className="tryAgain">
+                      Waiting...
+                    </div>
+    </div>
+  </div>
+)}
+
+
 
              {!ConnectedAccount() && (
             <div className="gameOverOverlay">

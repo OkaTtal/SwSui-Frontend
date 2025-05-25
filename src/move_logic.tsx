@@ -30,7 +30,10 @@ const MODULE_NAME = 'swsui_nft';
 //       });
 
 //   }s
-export function async_grid_board(signAndExecuteTransaction: any,object_id: any,col: number[],row:number[],value:number[],gameover:boolean,score: number,move_step:number){  
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+export function async_grid_board(signAndExecuteTransaction: any,object_id: any,col: number[],row:number[],value:number[],gameover:boolean,score: number,move_step:number, setLoading: any){  
   // const [digest, setDigest] = useState('');
   const tx = new Transaction();
   console.log('开始调用: ' + object_id)
@@ -52,16 +55,23 @@ signAndExecuteTransaction(
     chain: 'sui:testnet',
   },
   {
-    onSuccess: (result: any) => {
+    onSuccess: async (result: any) => {
       console.log('grid board updated', result);
+      await sleep(1500)
+      setLoading(false)
     },
+    onError: async (error: any) => {
+      console.error('transaction failed', error);
+      await sleep(1500)
+      setLoading(false); // 解锁
+    }
   },
 );
 
 }
 
 
-  export function create_grid_board(signAndExecuteTransaction: any){  
+  export function create_grid_board(signAndExecuteTransaction: any,setLoading: any){  
     
    
       // const [digest, setDigest] = useState('');
@@ -77,16 +87,23 @@ signAndExecuteTransaction(
         chain: 'sui:testnet',
       },
       {
-        onSuccess: (result: any) => {
+        onSuccess: async (result: any) => {
           console.log('grid board created', result);
+          await sleep(1500)
+          setLoading(false); // 
         },
+        onError: async (error: any) => {
+          console.error('transaction failed', error);
+          await sleep(1500)
+          setLoading(false); // 解锁
+        }
       },
     );
     
     
   }
 
-export function send_nft(signAndExecuteTransaction: any){  
+export function send_nft(signAndExecuteTransaction: any,setLoading: any){  
   const name = new TextEncoder().encode('Waves'); // vector<u8>
   const description = new TextEncoder().encode('SwSui NFT');
   const creator = new TextEncoder().encode('First NFT Fixed');
@@ -125,9 +142,18 @@ export function send_nft(signAndExecuteTransaction: any){
       chain: 'sui:testnet',
     },
     {
-      onSuccess: (result: any) => {
+      onSuccess: async (result: any) => {
         console.log('executed transaction', result);
+        await sleep(1500)
+        
+        setLoading(false)
       },
+      onError: async (error: any) => {
+        console.error('transaction failed', error);
+        await sleep(1500)
+        setLoading(false); // 解锁
+      }
+      
     },
   );
   

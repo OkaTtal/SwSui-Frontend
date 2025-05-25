@@ -104,7 +104,9 @@
   }
   .tryAgain{
       padding: 10;
-      background: #2774b6;
+      background: linear-gradient(to right, #225fc8, #6695dd, #225fc8);
+      animation: gradientMove 5s ease infinite;
+      background-Size: 200% 100%;
       font-family: 'WaterBrush', sans-serif;
       color: #F8F5F0;
       width: 80px;
@@ -171,5 +173,4 @@
   .splash {
     animation: splash 0.6s ease-out;
   }
-  
   
