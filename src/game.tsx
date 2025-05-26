@@ -18,6 +18,8 @@ let minted = false;
 let first2 = true
 let total_move_step = 0
 let is2048 = false;
+let is4096 = false;
+let is8192 = false;
 type Grid = {
     row: number,
     col:number,
@@ -319,9 +321,21 @@ function resetMilestones() {
             if (cur !== 0 && cur === grid[i].value) {
               grid[i].value = 0;
               grid[last_index].value = cur * 2;
-              if(grid[last_index].value==1024&&!is2048){
+              if(grid[last_index].value==2048&&!is2048){
                 setMint(true)
                 is2048=true
+              }
+              if(grid[last_index].value==2048&&!is2048){
+                setMint(true)
+                is2048=true
+              }
+              if(grid[last_index].value==4096&&!is4096){
+                setMint(true)
+                is4096=true
+              }
+              if(grid[last_index].value==8192&&!is8192){
+                setMint(true)
+                is8192=true
               }
               scoreToAdd += cur * 2;
               move_step++;
@@ -369,10 +383,19 @@ return newGrid;
             if (cur !== 0 && cur === grid[i].value) {
               grid[i].value = 0;
               grid[last_index].value = cur * 2;
-              if(grid[last_index].value==1024&&!is2048){
+              if(grid[last_index].value==2048&&!is2048){
                 setMint(true)
                 is2048=true
               }
+              if(grid[last_index].value==4096&&!is4096){
+                setMint(true)
+                is4096=true
+              }
+              if(grid[last_index].value==8192&&!is8192){
+                setMint(true)
+                is8192=true
+              }
+
               scoreToAdd += cur * 2;
               move_step++;
               cur = 0;
